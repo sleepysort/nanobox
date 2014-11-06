@@ -1,0 +1,4 @@
+.keys/APP_KEY
+.keys/APP_SECRET
+.config/mountpoint
+.config/credentials
