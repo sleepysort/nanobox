@@ -2,3 +2,4 @@
 .keys/APP_SECRET
 .config/mountpoint
 .config/credentials
+.config/synctime
