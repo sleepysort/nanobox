@@ -9,7 +9,10 @@ Setup Instructions
 1. Make sure you have Python 2.7 installed and correctly setup in your `PATH`.
 2. [Download](https://bootstrap.pypa.io/get-pip.py) and install `pip`.
 3. Run `pip install dropbox`. You may need to use `sudo`.
-4. Done! Run `nanobox.py` to use Nanobox.
+4. [Download](https://github.com/sleepysort/nanobox/archive/master.zip) Nanobox.
+5. Done! Run `nanobox.py` to use Nanobox.
+
+** You must add a Dropbox application key and secret key in the `.keys/` directory for the application to work. See notes. **
 
 Notes
 -----
