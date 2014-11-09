@@ -5,7 +5,8 @@ operations.
 
 import os
 
-from nanobox import settings, sync
+import cPickle as pickle
+from nanobox import settings
 
 
 # Exception that is raised when mount point is invalid
@@ -52,7 +53,7 @@ def listAll():
         result = set()
         topdir = getMountPoint()
         for root, dirs, files in os.walk(topdir):
-            root = root[len(topdir):]  # bit of a hack; fix this
+            root = "/" + root[len(topdir) + 1:]  # bit of a hack; fix this
             for name in files:
                 result.add(os.path.join(root, name))
         return result
@@ -64,14 +65,46 @@ def listAll():
 def listChanged():
     try:
         topdir = getMountPoint()
-        synctime = sync.getSyncTime()
-        syncfiles = sync.getSyncFiles()
-        result = listAll()
+        synctime = getSyncTime()
+        syncfiles = getSyncFiles()
+        localfiles = listAll()
+        modified = set()
+        newfiles = set()
 
-        for f in result:
-            if os.path.getmtime(os.path.join(topdir + '/', f)) > synctime or \
-               f not in syncfiles:
-                result.remove(f)
-        return result
+        for f in localfiles:
+            localpath = topdir + f
+            if os.path.getmtime(os.path.join(localpath)) > synctime:
+                modified.add(f)
+            elif f not in syncfiles:
+                newfiles.add(f)
+        return (modified, newfiles)
     except InvalidMountPointException:
         raise
+
+
+# Get the time of the last sync
+def getSyncTime():
+    try:
+        with open(settings.NANOBOX_PATHS['synctime'], 'r') as f:
+            return float(f.readline())
+    except IOError:
+        return 0
+
+
+# Update the time of last sync
+def setSyncTime(synctime):
+    with open(settings.NANOBOX_PATHS['synctime'], 'w+') as f:
+        f.write(str(synctime))
+
+
+# Return the set of files that were last synced.
+def getSyncFiles():
+    try:
+        syncfiles = pickle.load(open(settings.NANOBOX_PATHS['syncfiles'], 'rb')) 
+        return syncfiles
+    except:
+        return set()
+
+# Updates the set of files that have been synced.
+def setSyncFiles(syncfiles):
+    pickle.dump(syncfiles, open(settings.NANOBOX_PATHS['syncfiles'], 'wb+'))

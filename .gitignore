@@ -3,4 +3,5 @@
 .config/mountpoint
 .config/credentials
 .config/synctime
+.config/syncfiles
 *.pyc

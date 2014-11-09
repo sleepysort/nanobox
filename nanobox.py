@@ -2,6 +2,7 @@
 import dropbox
 import os, sys, time
 
+from multiprocessing import Process
 from nanobox import credentials, filesystem, settings, sync
 
 # Print version and usage information
@@ -101,16 +102,54 @@ if __name__ == '__main__':
             print 'No mount point set.'
             sys.exit(0)
 
-        print filesystem.listAll()
+        modifiedfiles, newfiles = filesystem.listChanged()
+
+        print "\nModified files:"
+        if len(modifiedfiles) == 0:
+            print "\tNone"
+        else:
+            for s in modifiedfiles:
+                print "\t" + s
+
+        print "\nNew files:"
+        if len(newfiles) == 0:
+            print "\tNone"
+        else:
+            for s in newfiles:
+                print "\t" + s        
 
     # Sync the files to Nanobox
     elif sys.argv[1] == 'sync':
-        # TODO: Implement
-        sync.synchronize(None)
-        #with open(NANOBOX_PATHS['sync'], 'w+') as f:
-        #    synctime = time.time()
-        #    f.write(str(synctime))
-        #    print "synced at " + str(synctime)
+        animation_frames = ['|', '/', '-', '\\', '-', '/']
+        modifiedfiles, newfiles = filesystem.listChanged()
+        localfiles = modifiedfiles.union(newfiles)
+        cloudfiles = set()
+        p= Process(target=sync.synchronize, args=(localfiles, cloudfiles))
+        p.start()
+
+        sys.stdout.write('Synchronizing... |')
+        frame = 0
+        while (p.is_alive()):
+            sys.stdout.write('\b' + animation_frames[frame % 6])
+            frame += 1
+        print '\n'
+        p.join()
+        print 'Synchronization complete!'
+
+        print "\nPushed files:"
+        if len(localfiles) == 0:
+            print "\tNone"
+        else:
+            for s in localfiles:
+                print "\t" + s
+
+        print "\nPulled files:"
+        if len(cloudfiles) == 0:
+            print "\tNone"
+        else:
+            for s in cloudfiles:
+                print "\t" + s  
+
 
     # Invalid command; exit the program
     else:
