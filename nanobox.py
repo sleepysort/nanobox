@@ -2,7 +2,7 @@
 import dropbox
 import os, sys, time
 
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 from nanobox import credentials, filesystem, settings, sync
 
 # Print version and usage information
@@ -102,7 +102,9 @@ if __name__ == '__main__':
             print 'No mount point set.'
             sys.exit(0)
 
-        modifiedfiles, newfiles = filesystem.listChanged()
+        modifiedfiles, newfiles, disk_size = filesystem.listChanged()
+
+        print 'Currently using ' + str(disk_size) + 'B of space.'
 
         print "\nModified files:"
         if len(modifiedfiles) == 0:
@@ -121,19 +123,22 @@ if __name__ == '__main__':
     # Sync the files to Nanobox
     elif sys.argv[1] == 'sync':
         animation_frames = ['|', '/', '-', '\\', '-', '/']
-        modifiedfiles, newfiles = filesystem.listChanged()
+        modifiedfiles, newfiles, disk_size = filesystem.listChanged()
         localfiles = modifiedfiles.union(newfiles)
         cloudfiles = set()
-        p= Process(target=sync.synchronize, args=(localfiles, cloudfiles))
+        queue = Queue()
+        p = Process(target=sync.synchronize, args=(localfiles, queue))
         p.start()
 
         sys.stdout.write('Synchronizing... |')
         frame = 0
         while (p.is_alive()):
-            sys.stdout.write('\b' + animation_frames[frame % 6])
+            sys.stdout.write('\b' + animation_frames[(frame / 20) % 6])
             frame += 1
         print '\n'
         p.join()
+        cloudfiles = queue.get()
+        cloud_size = queue.get()
         print 'Synchronization complete!'
 
         print "\nPushed files:"
@@ -148,8 +153,11 @@ if __name__ == '__main__':
             print "\tNone"
         else:
             for s in cloudfiles:
-                print "\t" + s  
+                print "\t" + s
 
+        print '\nSize on disk: \t' + str(disk_size) + 'B'
+        print 'Size in Nanobox: \t' + str(cloud_size) + 'B'
+        print 'Space saved:\t' + str(disk_size - cloud_size) + 'B'
 
     # Invalid command; exit the program
     else:

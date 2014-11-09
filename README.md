@@ -18,6 +18,6 @@ Notes
 -----
 
 - This application is not intended for widespread usage. This was mainly an experiment in using the Dropbox APIs.
-- The compression module is not yet done. Next thing on the list.
 - You need the Dropbox application key and secret key in the `.keys/APP_KEY` and `.keys/APP_SECRET` files (respectively) for Nanobox to work. I have not uploaded my own keys for obvious reasons.
 - Do not manually modify any files in the `.config` folder. The application is not guaranteed to work if those files are tampered with.
+- The application will pull new files, but will not pull modified files in the cloud. Delete the local copy, then sync again.

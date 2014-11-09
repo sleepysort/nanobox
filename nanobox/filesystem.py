@@ -47,37 +47,39 @@ def getMountPoint():
 
 
 # Returns a set of all files in the mount point (including those
-# in subfolders).
+# in subfolders), and the size.
 def listAll():
     try:
+        total_size = 0
         result = set()
         topdir = getMountPoint()
         for root, dirs, files in os.walk(topdir):
-            root = "/" + root[len(topdir) + 1:]  # bit of a hack; fix this
+            sroot = "/" + root[len(topdir) + 1:]  # bit of a hack; fix this
             for name in files:
-                result.add(os.path.join(root, name))
-        return result
+                result.add(os.path.join(sroot, name))
+                total_size += os.path.getsize(os.path.join(root, name))
+        return (result, total_size)
     except InvalidMountPointException:
         raise
 
 # Returns a set of all files that have been modified since the last
-# sync.
+# sync, and also propagates the size.
 def listChanged():
     try:
         topdir = getMountPoint()
         synctime = getSyncTime()
         syncfiles = getSyncFiles()
-        localfiles = listAll()
+        localfiles, total_size = listAll()
         modified = set()
         newfiles = set()
 
         for f in localfiles:
             localpath = topdir + f
-            if os.path.getmtime(os.path.join(localpath)) > synctime:
-                modified.add(f)
-            elif f not in syncfiles:
+            if f not in syncfiles:
                 newfiles.add(f)
-        return (modified, newfiles)
+            elif os.path.getmtime(os.path.join(localpath)) > synctime:
+                modified.add(f)
+        return (modified, newfiles, total_size)
     except InvalidMountPointException:
         raise
 
