@@ -2,45 +2,12 @@
 import dropbox
 import os, sys, time
 
-# Version number
-NANOBOX_VERSION = '0.1'
-
-# Paths to configuration files
-NANOBOX_PATHS = {
-    'mount': os.path.join(os.path.dirname(__file__), '.config/mountpoint'),
-    'sync': os.path.join(os.path.dirname(__file__), '.config/synctime'),
-    'credentials': os.path.join(os.path.dirname(__file__), '.config/credentials'),
-    'app_key': os.path.join(os.path.dirname(__file__), '.keys/APP_KEY'),
-    'app_secret': os.path.join(os.path.dirname(__file__), '.keys/APP_SECRET'),
-    'default_mountpoint': '~/Nanobox/',
-}
+from nanobox import credentials, filesystem, settings, sync
 
 # Print version and usage information
 def about():
-    print 'Nanobox v' + NANOBOX_VERSION
+    print 'Nanobox v' + settings.NANOBOX_VERSION
     print 'Usage: nanobox login|logout|mount <path>|status|sync'
-
-# Read user access token
-def readCredentials():
-    try:
-        with open(NANOBOX_PATHS['credentials'], 'r') as f:
-            access_token = f.readline()
-            user_name = f.readline()
-            return (access_token, user_name)
-    except IOError:
-        print 'You are not logged in or your session has expired.'
-        print 'Try logging in again.'
-        exit(1)
-
-# Read mount point path from file
-def readMount():
-    try:
-        with open(NANOBOX_PATHS['mount'], 'r') as f:
-            return f.readline()
-    except IOError:
-        print 'ERROR: ' + NANOBOX_PATHS['mount'] + ' does not exist or is corrupted'
-        print 'Try deleting the file, then  $ nanobox mount'
-        exit(1)
 
 def readSyncTime():
     try:
@@ -48,14 +15,6 @@ def readSyncTime():
             return float(f.readline())
     except IOError:
         return 0
-
-def getFileStatus():
-    topdir = readMount()
-    synctime = readSyncTime()
-    for root, dirs, files in os.walk(topdir):
-        for name in files:
-            if os.path.getmtime(os.path.join(root, name)) > synctime:
-                print os.path.join(root, name)
 
 if __name__ == '__main__':
     # Check that valid arguments were passed
@@ -65,35 +24,37 @@ if __name__ == '__main__':
 
     # Execute appropriate command
     if sys.argv[1] == 'mount':
-        with open(NANOBOX_PATHS['mount'], 'w+') as f:
-            if len(sys.argv) == 3 and os.path.exists(sys.argv[2]) and os.path.isdir(sys.argv[2]):
-                f.write(sys.argv[2])
-                print 'Mount point set to ' + sys.argv[2]
+        try:
+            if len(sys.argv) == 3:
+                mountpoint = filesystem.setMountPoint(sys.argv[2])
             else:
-                mountpath = os.path.dirname(os.path.expanduser(NANOBOX_PATHS['default_mountpoint']))
-                if not os.path.exists(mountpath):
-                    os.mkdir(mountpath)
-                    print "Created new directory at " + mountpath
-                f.write(mountpath)
-                print 'Mount point set to ' + mountpath
+                mountpoint = filesystem.setMountPoint()
+            print "Mount point set to " + mountpoint
+        except IOError:
+            print "Failed to set mountpoint."
+            sys.exit(1)
 
     # Login
     elif sys.argv[1] == 'login':
         # Check to see if user is already logged in
-        if os.path.isfile(NANOBOX_PATHS['credentials']):
-            access_token, user_name = readCredentials()       ###DRY A
-            print 'Currently logged in as ' + user_name + '.'
+        try:
+            access_token, user_name = credentials.getCredentials()
+            print "Already logged in as " + user_name + "."
             sys.exit(0)
+        except credentials.NotLoggedInException:
+            pass
 
         # Load app keys
         try:
-            with open(NANOBOX_PATHS['app_key'], 'r') as f:
+            print settings.NANOBOX_PATHS['app_key']
+            with open(settings.NANOBOX_PATHS['app_key'], 'r') as f:
                 APP_KEY = f.readline().strip()
-            with open(NANOBOX_PATHS['app_secret'], 'r') as f:
+            with open(settings.NANOBOX_PATHS['app_secret'], 'r') as f:
                 APP_SECRET = f.readline().strip()
         except IOError:
-            print 'ERROR: ' + NANOBOX_PATHS['app_key'] + ' or ' + NANOBOX_PATHS['app_secret'] + ' is invalid.'
-            exit(1)
+            print 'ERROR: ' + settings.NANOBOX_PATHS['app_key'] + ' or ' + \
+                  settings.NANOBOX_PATHS['app_secret'] + ' is invalid.'
+            sys.exit(1)
 
         # Begin authentication flow
         flow = dropbox.client.DropboxOAuth2FlowNoRedirect(APP_KEY, APP_SECRET)
@@ -107,35 +68,49 @@ if __name__ == '__main__':
         user_name = client.account_info()['display_name']
 
         # Store credentials in files
-        with open(NANOBOX_PATHS['credentials'], 'w+') as f:
-            f.write(access_token + '\n')
-            f.write(user_name)
+        credentials.login(access_token, user_name)
 
         # Success!
         print 'Successfully logged in as ' + user_name + '!'
 
     # Logout
     elif sys.argv[1] == 'logout':
-        access_token, user_name = readCredentials()
-        ans = raw_input('Logout (Currently logged in as ' + user_name + ')? [y/n] ')
-        if ans == 'y':
-            os.remove(NANOBOX_PATHS['credentials'])
-            print "Logout successful!"
+        try:
+            access_token, user_name = credentials.getCredentials()
+            ans = raw_input('Logout? (Currently logged in as ' + user_name + ')[y/n] ')
+            if ans == 'y':
+                credentials.logout()
+                print "Logout successful!"
+        except credentials.NotLoggedInException:
+            print "You are not currently logged in."
+            sys.exit(0)
 
     # Check the status of files, logged in user, mount point, etc
     elif sys.argv[1] == 'status':
         # TODO: Implement
-        access_token, user_name = readCredentials()        ###DRY A
-        print 'Currently logged in as ' + user_name + '.'
-        getFileStatus()
+        try:
+            access_token, user_name = credentials.getCredentials()
+            print 'Currently logged in as ' + user_name + '.'
+        except credentials.NotLoggedInException:
+            print 'Not logged in.'
+
+        try:
+            mountpoint = filesystem.getMountPoint()
+            print 'Mount point set to ' + mountpoint
+        except credentials.NotLoggedInException:
+            print 'No mount point set.'
+            sys.exit(0)
+
+        print filesystem.listAll()
 
     # Sync the files to Nanobox
     elif sys.argv[1] == 'sync':
         # TODO: Implement
-        with open(NANOBOX_PATHS['sync'], 'w+') as f:
-            synctime = time.time()
-            f.write(str(synctime))
-            print "synced at " + str(synctime)
+        sync.synchronize(None)
+        #with open(NANOBOX_PATHS['sync'], 'w+') as f:
+        #    synctime = time.time()
+        #    f.write(str(synctime))
+        #    print "synced at " + str(synctime)
 
     # Invalid command; exit the program
     else:
