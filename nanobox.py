@@ -98,7 +98,7 @@ if __name__ == '__main__':
         try:
             mountpoint = filesystem.getMountPoint()
             print 'Mount point set to ' + mountpoint
-        except credentials.NotLoggedInException:
+        except filesystem.InvalidMountPointException:
             print 'No mount point set.'
             sys.exit(0)
 
