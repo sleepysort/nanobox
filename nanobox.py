@@ -155,6 +155,7 @@ if __name__ == '__main__':
             for s in cloudfiles:
                 print "\t" + s
 
+        modifiedfiles, newfiles, disk_size = filesystem.listAll()
         print '\nSize on disk: \t' + str(disk_size) + 'B'
         print 'Size in Nanobox: \t' + str(cloud_size) + 'B'
         print 'Space saved:\t' + str(disk_size - cloud_size) + 'B'
